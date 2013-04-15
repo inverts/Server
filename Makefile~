@@ -1,0 +1,2 @@
+make: boostTest.cpp
+	g++ boostTest.cpp -lboost_regex
