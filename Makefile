@@ -1,2 +1,2 @@
-make: boosttest.cpp
-	g++ boosttest.cpp -lboost_regex
+make: server.cpp
+	g++ server.cpp -lboost_system -lpthread
