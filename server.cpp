@@ -24,10 +24,15 @@ public:
   ss_server() {
     boost::asio::io_service io_service;
     tcp::resolver resolver(io_service);
-    tcp::endpoint endpoint(tcp::v4(), 1984);
-    tcp::acceptor acceptor_(io_service, endpoint);
+    tcp::resolver::query query("www.google.com", "80");//155.98.108.62
+    tcp::resolver::iterator iterator = resolver.resolve(query);
+    cout << "Creating endpoint." << endl;
+    tcp::endpoint endpoint = *iterator;
+    //tcp::acceptor acceptor_(io_service, endpoint);
     tcp::socket socket_(io_service);
-    boost::asio::async_write(socket_, boost::asio::buffer("test", 15), boost::bind(&ss_server::sendCompleteHandler, this, boost::asio::placeholders::error));
+    socket_.connect(endpoint);
+    cout << "About to write." << endl;
+    boost::asio::async_write(socket_, boost::asio::buffer("test", 4), boost::bind(&ss_server::sendCompleteHandler, this, boost::asio::placeholders::error));
   }
 
   /*
