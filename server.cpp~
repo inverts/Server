@@ -1,0 +1,15 @@
+/*
+ * This is the server end of the spreadsheet client.
+ *
+ */
+#include <boost/asio.hpp>
+#include <iostream>
+#include <string>
+
+class server {
+tcp::socket socket_;
+}
+
+int main() {
+  cout("Welcome to the server.");
+}
