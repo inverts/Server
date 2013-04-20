@@ -22,6 +22,12 @@ public:
    * Instantiate server. Load spreadsheet files. Start/Prepare for accepting client requests. Load socket.
    */
   ss_server() {
+  }
+
+  /*
+   * Sends a message.
+   */
+  void sendMessage(std::string message) { 
     boost::asio::io_service io_service;
     tcp::resolver resolver(io_service);
     tcp::resolver::query query("www.google.com", "80");//155.98.108.62
@@ -34,44 +40,19 @@ public:
     cout << "About to write." << endl;
     boost::asio::async_write(socket_, boost::asio::buffer("test", 4), boost::bind(&ss_server::sendCompleteHandler, this, boost::asio::placeholders::error));
   }
-
-  /*
-   *
-   */
-  void sendMessage(std::string message) { /*
-    std::size_t size_in_bytes = message::size(); //Is message:size() not automatically convertible to size_t?
-    boost::asio::async_write(socket_, boost::asio::buffer(message, size_in_bytes), sendCompleteHandler);
-					  */
-  }
   
+  /*
+   * Receives a message.
+   */
   void receiveMessage() {
     /*
-     try
-      {
-	boost::asio::io_service io_service;
-	tcp::endpoint endpoint(tcp::v4(), default_port); //Set up an endpoint with IPv4 on our default port.
-	tcp::acceptor acceptor(io_service, endpoint); //Create a socket acceptor
-
-	for (;;)
-	  {
-	    tcp::iostream stream;
-	    boost::system::error_code ec;
-	    acceptor.accept(*stream.rdbuf(), ec);
-	    if (!ec)
-	      {
-		stream << make_daytime_string();
-	      }
-	  }
-      }
-    catch (std::exception& e)
-      {
-	std::cerr << e.what() << std::endl;
-      }
-
+      std::size_t size_in_bytes = message::size(); //Is message:size() not automatically convertible to size_t?
+      boost::asio::async_write(socket_, boost::asio::buffer(message, size_in_bytes), sendCompleteHandler);
     */
   }
 
   /*
+   * Callback function for a complete send operation.
    * error: Result of operation
    * bytes_transferred: Number of bytes written. This should be checked to make sure the entire message was sent.
    */
