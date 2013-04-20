@@ -30,15 +30,20 @@ public:
   void sendMessage(std::string message) { 
     boost::asio::io_service io_service;
     tcp::resolver resolver(io_service);
-    tcp::resolver::query query("www.google.com", "80");//155.98.108.62
+    tcp::resolver::query query("155.98.111.122", "1984");//155.98.108.62
     tcp::resolver::iterator iterator = resolver.resolve(query);
     cout << "Creating endpoint." << endl;
     tcp::endpoint endpoint = *iterator;
     //tcp::acceptor acceptor_(io_service, endpoint);
     tcp::socket socket_(io_service);
-    socket_.connect(endpoint);
     cout << "About to write." << endl;
-    boost::asio::async_write(socket_, boost::asio::buffer("test", 4), boost::bind(&ss_server::sendCompleteHandler, this, boost::asio::placeholders::error));
+    socket_.open(tcp::v4());
+    socket_.connect(endpoint); //Connects the socket to this particular endpoint
+    //socket_.async_send(boost::asio::buffer(message, message.size()), boost::bind(&ss_server::sendCompleteHandler2, this, boost::asio::placeholders::error));
+    boost::asio::async_write(socket_, boost::asio::buffer(message, message.size()), boost::bind(&ss_server::sendCompleteHandler, this, boost::asio::placeholders::error));
+    socket_.close();
+    std::string input;
+    cin >> input;
   }
   
   /*
@@ -57,12 +62,22 @@ public:
    * bytes_transferred: Number of bytes written. This should be checked to make sure the entire message was sent.
    */
   void sendCompleteHandler(const boost::system::error_code& error/*, std::size_t bytes_transferred*/) {
-    cout << "Send was completed successfully.";
+    cout << "Send was completed successfully." << endl;
+  }
+
+  /*
+   * Callback function for a complete send operation.
+   * error: Result of operation
+   * bytes_transferred: Number of bytes written. This should be checked to make sure the entire message was sent.
+   */
+  void sendCompleteHandler2(const boost::system::error_code& error, std::size_t bytes_transferred) {
+    cout << "Send was completed successfully 2." << endl;
   }
 };
 
 int main() {
   cout << "Welcome to the server." << endl;
   ss_server s;
+  s.sendMessage("test");
   cout << "Function completed" << endl;
 }
