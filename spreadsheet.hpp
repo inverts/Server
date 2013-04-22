@@ -14,11 +14,10 @@ private:
   int rows;
   int cols;
   std::string fileLocation; //We must store the file location for this spreadsheet.
-  //std::string cells[100][100]; //Allows for a 100x100 grid of cells.
   hashmap cells;
   std::string name;
   std::string password;
-  std::string version;
+  int version;
 
 public:
   spreadsheet(string file);
@@ -34,5 +33,9 @@ public:
   string get_cell_data(string cellname);
 
   string generate_xml();
+
+  void set_version(int v);
+
+  void increment_version();
 
 };

@@ -19,9 +19,10 @@ typedef boost::unordered_map<std::string,std::string> hashmap;
 /*
  * Spreadsheet constructor.
  */
-spreadsheet::spreadsheet(string file) {
-  fileLocation = file;
-  version = "1.0";
+spreadsheet::spreadsheet(string name) {
+  fileLocation = "spreadsheets/" + name;
+  this->name = name;
+  version = 0;
 }
 
 
@@ -74,7 +75,7 @@ void spreadsheet::load_spreadsheet() {
       tempint = temp.find("\""); //Find ending quote
       if (tempint == std::string::npos)
 	return; //Malformed.
-      version = temp.substr(0, tempint);
+      version = atoi(temp.substr(0, tempint).c_str());
 
       //This should be the first cell.
       std::getline(fs, temp, '<');
@@ -152,6 +153,19 @@ string spreadsheet::generate_xml() {
   return ss.str();
 }
 
+/*
+ * Sets the version.
+ */
+void spreadsheet::set_version(int v) {
+  this->version = v;
+}
+
+/*
+ * Increments version number by 1.
+ */
+void spreadsheet::increment_version() {
+  this->version += 1;
+}
 
 /*
  * This is just a tester method. It should be removed prior to deployment.
