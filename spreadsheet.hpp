@@ -11,8 +11,6 @@ typedef boost::unordered_map<std::string,std::string> hashmap;
 class spreadsheet {
 
 private:
-  int rows;
-  int cols;
   std::string fileLocation; //We must store the file location for this spreadsheet.
   hashmap cells;
   std::string name;
@@ -21,6 +19,8 @@ private:
 
 public:
   spreadsheet(string file);
+
+  spreadsheet& operator=(const spreadsheet &rhs);
 
   bool check_password(string password) const;
 
@@ -31,6 +31,8 @@ public:
   bool try_update_cell(string cellname, string data);
 
   string get_cell_data(string cellname);
+
+  string get_name() const;
 
   string generate_xml();
 

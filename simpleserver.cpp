@@ -3,13 +3,14 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp> 
 #include <boost/array.hpp>
+#include "spreadsheet.hpp"
 #include <iostream>  
 #include <string> 
 
 using namespace std;
 
 /*
- * This represents a single client connection.g
+ * This represents a single client connection.
  */
 class client_connection
   : public boost::enable_shared_from_this<client_connection> 
@@ -38,7 +39,7 @@ public:
   }
 
   void read_handler(const boost::system::error_code &ec/*, std::size_t bytes_transferred*/) 
-  { g
+  { 
     if (!ec) {
       cout << "The server read an incoming message:" << endl; 
       cout << "---------------- Message Received ----------------" << endl;
@@ -67,6 +68,27 @@ public:
 boost::asio::io_service io_service; 
 boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::tcp::v4(), 1984); 
 boost::asio::ip::tcp::acceptor *acceptorptr; 
+
+typedef boost::unordered_map<std::string,spreadsheet> hashmap;
+
+void printfiles() {
+  DIR *dir;
+  struct dirent *ent;
+  if ((dir = opendir ("spreadsheets")) != NULL) {
+    while ((ent = readdir(dir)) != NULL) {
+      string file = ent->d_name;
+      if (file!="." && file != "..") {
+	cout << file << endl;
+	spreadsheet ss(file);
+	hashmap[file] = ss;
+      }
+ 
+    }
+    closedir (dir);
+  } else {
+    //Directory fail
+  }
+}
 
 void start_accept(); //Forward declaration
 typedef boost::shared_ptr<client_connection> client_connection_ptr;

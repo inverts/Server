@@ -5,7 +5,7 @@
 #include <fstream> 
 #include <iostream> 
 #include <boost/unordered_set.hpp>
-#include <sstream>
+#include <sstream> 
 
 #ifndef SPREADSHEET_HPP
 #define SPREADSHEET_HPP
@@ -13,6 +13,7 @@
 #endif
 
 using namespace std;
+
 
 typedef boost::unordered_map<std::string,std::string> hashmap;
 
@@ -25,6 +26,16 @@ spreadsheet::spreadsheet(string name) {
   version = 0;
 }
 
+spreadsheet& spreadsheet::operator=(const spreadsheet &rhs) {
+  if (this == &rhs)
+    return *this;
+  this->name = rhs.name;
+  this->fileLocation = rhs.fileLocation;
+  this->version = rhs.version;
+  this->cells = rhs.cells;
+  this->password = rhs.password;
+  return *this;
+}
 
 /*
  * Checks if a password matchs this spreadsheet's password.
@@ -135,10 +146,13 @@ bool spreadsheet::try_update_cell(string cellname, string data) {
 string spreadsheet::get_cell_data(string cellname) {
   if (cells.find(cellname) == cells.end())
     return NULL;
-  else
-    return cells[cellname];
+  return cells[cellname];
+
 }
 
+string spreadsheet::get_name() const{
+  return this->name;
+}
 
 /*
  * Generates an XML string representation of the spreadsheet.
@@ -167,10 +181,14 @@ void spreadsheet::increment_version() {
   this->version += 1;
 }
 
+
+
 /*
  * This is just a tester method. It should be removed prior to deployment.
  */
+/*
 int main() {
+  printfiles();
   cout << "Please specify filename of spreadsheet." << endl;
   string filename;
   cin >> filename;
@@ -188,3 +206,4 @@ int main() {
   cout << "Spreadsheet saved." << endl;
   return 0;
 }
+*/

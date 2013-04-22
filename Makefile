@@ -4,6 +4,9 @@ sockettool: sockettool.cpp
 simpleserver: simpleserver.cpp
 	g++ simpleserver.cpp -lboost_system -lpthread -o simpleserver
 
+spreadsheet: spreadsheet.cpp
+	g++ spreadsheet.cpp -lboost_system -lpthread -o spreadsheet
+
 server: spreadsheetserver.cpp spreadsheet.cpp spreadsheet.hpp
 	g++ spreadsheetserver.cpp spreadsheet.cpp -lboost_system -lpthread -o server
 
