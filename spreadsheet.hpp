@@ -25,4 +25,8 @@ public:
 
   bool try_update_cell(int row, int column, string data);
 
+  string get_cell_data(int row, int column);
+
+  string generate_xml();
+
 };

@@ -85,6 +85,10 @@ string spreadsheet::get_cell_data(int row, int column) {
   return cells[column][row];
 }
 
+string spreadsheet::generate_xml() {
+  
+}
+
 int main() {
   cout << "Please specify filename of spreadsheet." << endl;
   string filename;
