@@ -8,4 +8,5 @@ server: spreadsheetserver.cpp spreadsheet.cpp spreadsheet.hpp
 	g++ spreadsheetserver.cpp spreadsheet.cpp -lboost_system -lpthread -o server
 
 clean:
-	rm *~
+	rm -f *~
+	rm -f *#
