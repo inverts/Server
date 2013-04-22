@@ -71,10 +71,6 @@ boost::asio::io_service io_service;
 boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::tcp::v4(), 1984); 
 boost::asio::ip::tcp::acceptor *acceptorptr; 
 
-struct spreadsheet_comparator {
-  bool operator() (const spreadsheet& lhs, const spreadsheet& rhs) const
-  {return lhs.get_name() == rhs.get_name();}
-};
 
 typedef boost::unordered_map<std::string, spreadsheet> spreadsheet_map;
 spreadsheet_map spreadsheets;

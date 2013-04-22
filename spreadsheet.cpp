@@ -50,13 +50,6 @@ bool spreadsheet::check_password(string pass) const {
 void spreadsheet::save_spreadsheet() {
   fstream fs;
   fs.open(fileLocation.c_str(), std::fstream::out); //This will create the file if it doesn't exist.
-  /*
-  hashmap::iterator iter;
-  fs << "<spreadsheet version=\"" << version << "\">\n";
-  for (iter = cells.begin(); iter != cells.end(); iter++) {
-    fs << "<cell><name>" << iter->first << "</name><contents>" << iter->second << "</contents></cell>\n";
-  }
-  */
   fs << generate_xml();
 
   fs.close();
@@ -186,9 +179,9 @@ void spreadsheet::increment_version() {
 /*
  * This is just a tester method. It should be removed prior to deployment.
  */
+
 /*
 int main() {
-  printfiles();
   cout << "Please specify filename of spreadsheet." << endl;
   string filename;
   cin >> filename;
@@ -206,4 +199,5 @@ int main() {
   cout << "Spreadsheet saved." << endl;
   return 0;
 }
+
 */
