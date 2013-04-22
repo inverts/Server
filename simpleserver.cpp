@@ -8,7 +8,9 @@
 
 using namespace std;
 
-
+/*
+ * This represents a single client connection.g
+ */
 class client_connection
   : public boost::enable_shared_from_this<client_connection> 
 {
@@ -36,7 +38,7 @@ public:
   }
 
   void read_handler(const boost::system::error_code &ec/*, std::size_t bytes_transferred*/) 
-  { 
+  { g
     if (!ec) {
       cout << "The server read an incoming message:" << endl; 
       cout << "---------------- Message Received ----------------" << endl;
@@ -74,17 +76,17 @@ void accept_handler(const boost::system::error_code &ec, client_connection_ptr c
   if (!ec) 
     { 
       cout << "New incoming connection received." << endl;
-      //Let's move this into the connection object
       connection->start();
     } 
   start_accept(); //Listen for more connections.
 } 
 
+
 void start_accept() {
   client_connection_ptr new_connection(new client_connection(io_service));
   acceptorptr->listen();
   cout << "This server is now listening for connections." << endl; 
-  acceptorptr->async_accept(new_connection->socket(), boost::bind(accept_handler, boost::asio::placeholders::error, new_connection)); //HOPE
+  acceptorptr->async_accept(new_connection->socket(), boost::bind(accept_handler, boost::asio::placeholders::error, new_connection));
 }
 
 

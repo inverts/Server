@@ -4,6 +4,8 @@
 #include <string> 
 #include <fstream> 
 #include <iostream> 
+#include <boost/unordered_set.hpp>
+#include <sstream>
 
 #ifndef SPREADSHEET_HPP
 #define SPREADSHEET_HPP
@@ -12,14 +14,14 @@
 
 using namespace std;
 
+typedef boost::unordered_map<std::string,std::string> hashmap;
+
 /*
  * Spreadsheet constructor.
  */
 spreadsheet::spreadsheet(string file) {
-  //Default rows/cols.
-  rows = 100;
-  cols = 100;
   fileLocation = file;
+  version = "1.0";
 }
 
 
@@ -29,7 +31,6 @@ spreadsheet::spreadsheet(string file) {
 bool spreadsheet::check_password(string pass) const {
   return (password == pass);
 }
-  
 
 /*
  * Saves the spreadsheet to the file specific to this object.
@@ -37,17 +38,18 @@ bool spreadsheet::check_password(string pass) const {
 void spreadsheet::save_spreadsheet() {
   fstream fs;
   fs.open(fileLocation.c_str(), std::fstream::out); //This will create the file if it doesn't exist.
-  int r, c;
-  for (r=0; r<rows; r++) {
-    for (c=0; c<cols; c++) {
-      fs << cells[c][r] << "\t";
-    }
-    fs << "\n";
+  /*
+  hashmap::iterator iter;
+  fs << "<spreadsheet version=\"" << version << "\">\n";
+  for (iter = cells.begin(); iter != cells.end(); iter++) {
+    fs << "<cell><name>" << iter->first << "</name><contents>" << iter->second << "</contents></cell>\n";
   }
+  */
+  fs << generate_xml();
+
   fs.close();
 
 }
-
 
 /*
  * Loads the spreadsheet into the file by the following spec:
@@ -57,34 +59,103 @@ void spreadsheet::save_spreadsheet() {
 void spreadsheet::load_spreadsheet() {
   fstream fs;
   fs.open(fileLocation.c_str(), std::fstream::in); //This will create the file if it doesn't exist.
-  string currentcell;
-  int r=0, c=0;
+  string temp;
+  int tempint;
+  string callnametemp;
   while (fs.good()) { //This will not pass if the file couldn't be opened.
-    std::getline(fs, currentcell, '\t');
-    if (currentcell == "\n") {
-      r++;
-      continue;
+    try {
+      std::getline(fs, temp, '<');
+      std::getline(fs, temp, '>');
+
+      tempint = temp.find("version=\""); //Find version info
+      if (tempint == std::string::npos)
+	return; //Malformed.
+      temp = temp.substr(tempint + 9);
+      tempint = temp.find("\""); //Find ending quote
+      if (tempint == std::string::npos)
+	return; //Malformed.
+      version = temp.substr(0, tempint);
+
+      //This should be the first cell.
+      std::getline(fs, temp, '<');
+      std::getline(fs, temp, '>');
+
+      while(temp == "cell") {
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+	if (temp != "name")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
+
+	callnametemp = temp; //Cell name.
+
+	std::getline(fs, temp, '>');
+	if (temp != "/name")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+	if (temp != "contents")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
+
+	cells[callnametemp] = temp; //Fill in cell contents.
+
+	std::getline(fs, temp, '>');
+	if (temp != "/contents")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+	if (temp != "/cell")
+	  return; //Malformed.
+
+	//Read in the next cell.
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+
+      }
+    } catch (int e) {
+      return; //Malformed.
     }
-    cells[c++][r] = currentcell;
-      
   }
   fs.close();
-}
+}  
 
 /*
  * Updates the specified cell. If the cell is out of bounds, returns false;
  */
-bool spreadsheet::try_update_cell(int row, int column, string data) {
-  if (row >= rows || column >=cols || row < 0 || column < 0)
-    return false;
-  cells[column][row] = data;
+bool spreadsheet::try_update_cell(string cellname, string data) {
+  cells[cellname] = data;
   return true;
 }
 
-string spreadsheet::get_cell_data(int row, int column) {
-  return cells[column][row];
+/*
+ * Returns the contents of a cell as a string.
+ */
+string spreadsheet::get_cell_data(string cellname) {
+  if (cells.find(cellname) == cells.end())
+    return NULL;
+  else
+    return cells[cellname];
 }
 
+
+/*
+ * Generates an XML string representation of the spreadsheet.
+ */
+string spreadsheet::generate_xml() {
+  hashmap::iterator iter;
+  std::stringstream ss;
+  ss << "<spreadsheet version=\"" << version << "\">\n";
+  for (iter = cells.begin(); iter != cells.end(); iter++) {
+   ss << "<cell><name>" << iter->first << "</name><contents>" << iter->second << "</contents></cell>\n";
+  }
+  return ss.str();
+}
+
+
+/*
+ * This is just a tester method. It should be removed prior to deployment.
+ */
 int main() {
   cout << "Please specify filename of spreadsheet." << endl;
   string filename;
@@ -93,9 +164,11 @@ int main() {
   cout << "Spreadsheet created." << endl;
   ss.load_spreadsheet();
   cout << "Spreadsheet loaded." << endl;
-  ss.try_update_cell(4,4, "Hello, World!");
+  ss.try_update_cell("A3", "NEW STRING!");
   cout << "Cell updated." << endl;
-  string data = ss.get_cell_data(4,4);
+  ss.try_update_cell("C45", "Weeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee!");
+  cout << "Cell updated." << endl;
+  string data = ss.get_cell_data("A3");
   cout << "Cell retrieved: " << data << endl;
   ss.save_spreadsheet();
   cout << "Spreadsheet saved." << endl;
