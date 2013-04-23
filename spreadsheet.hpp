@@ -1,6 +1,6 @@
 /*
- * This represents a spreadsheet object and provides functions for loading and saving into a file.
- */
+* This represents a spreadsheet object and provides functions for loading and saving into a file.
+*/
 
 #include <boost/unordered_map.hpp>
 #include <stack>
@@ -12,7 +12,7 @@ typedef boost::unordered_map<std::string,std::string> hashmap;
 class spreadsheet {
 
 private:
- std::string fileLocation; //We must store the file location for this spreadsheet.
+  std::string fileLocation; //We must store the file location for this spreadsheet.
   hashmap cells;
   std::string name;
   std::string password;
@@ -20,12 +20,17 @@ private:
   std::stack< std::pair<std::string,std::string> > undoStack;
   pair<string,string> lastUpdate;
   bool push;
-
+  int active_clients;
 
 public:
-  spreadsheet(string file);
+  spreadsheet(string file, string pass);
 
   spreadsheet& operator=(const spreadsheet &rhs);
+
+
+  int get_active_clients();
+  void add_active_client();
+  void remove_active_client();
 
   bool check_password(string password) const;
 

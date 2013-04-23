@@ -11,23 +11,48 @@
 
 using namespace std;
 
+typedef boost::unordered_map<std::string, spreadsheet> spreadsheet_map;
+
 /*
  * This represents a single client connection.
  */
 class client_connection
   : public boost::enable_shared_from_this<client_connection> 
 {
+private:
+  std::string current_spreadsheet; //The name of the current spreadsheet.
+
+  //Creates a new spreadsheet
+  bool create_spreadsheet(string name, string password)
+  {
+    if (spreadsheets->find(name) != spreadsheets->end())
+      return false; //This spreadsheet already exists.
+    spreadsheet ss(name,password);
+    spreadsheets->insert(std::make_pair(name,ss));
+    ss.save_spreadsheet();
+    return true;
+  }
+
+  bool join_spreadsheet(string name, string password) {
+    cout << "Initial current spreadsheet: " << current_spreadsheet << endl;
+    if (spreadsheets->find(name) != spreadsheets->end())
+      return false; //This spreadsheet already exists.
+    if(!spreadsheets->at(name).check_password(password))
+      return false; //Wrong password.
+    current_spreadsheet = name;
+    cout << "Current spreadsheet changed to: " << current_spreadsheet << endl;
+  }
+
 public:
   boost::asio::ip::tcp::socket sock; 
   boost::array<char, 1024> buffer; //This is the buffer we use to read in messages.
   std::string updatedCell;
   std::string name;
-  std::string password;
+  std::string password; //DELETE
   int version;
-  //spreadsheet ss(std::string buffer.data());
-  //spreadsheet::spreadsheet userSp(name,password);
+  spreadsheet_map *spreadsheets; //This is a hashmap of all the available spreadsheets.
 
-  client_connection(boost::asio::io_service& io_service)
+  client_connection(boost::asio::io_service& io_service, spreadsheet_map *sheets)
     : sock(io_service)
   {
     //Creates new socket.
@@ -35,6 +60,7 @@ public:
     int i=0;
     for (i=0; i<1024; i++)
       buffer[i] = '\0';
+    spreadsheets = sheets;
   }
 
   boost::asio::ip::tcp::socket& socket()
@@ -43,29 +69,38 @@ public:
   }
 
   void start() {
+    //THIS NEEDS TO BE REMOVED.
     boost::asio::async_write(sock, boost::asio::buffer("You have successfully connected to the server."), boost::bind(&client_connection::write_handler, shared_from_this(), boost::asio::placeholders::error)); 
   }
 
-  void read_handler(const boost::system::error_code &ec/*, std::size_t bytes_transferred*/) 
+  void clean_buffer() {
+      int length = strlen(buffer.data());
+      int i;
+      for (i=0; i<length; i++)
+	buffer[i] = '\0'; 
+  }
+  /*
+   * Handles async_read calls.
+   */
+  void read_handler(const boost::system::error_code &ec) 
   { 
+    string message(buffer.data());
     if (!ec) {
+
+      //REMOVE (possibly)
       cout << "The server read an incoming message:" << endl; 
       cout << "---------------- Message Received ----------------" << endl;
-      cout << string(buffer.data()) << endl; 
+      cout << message << endl; 
       cout << "------------------ End Message -------------------" << endl;
-      readData();
-      int msg_length = strlen(buffer.data());
-      int i;
-      //Clean the buffer.
-      for (i=0; i<msg_length; i++)
-	buffer[i] = '\0';
-      cout << "Server is sending an acknowledgement response." << endl;
-      boost::asio::async_write(sock, boost::asio::buffer("Welcome"), boost::bind(&client_connection::write_handler, shared_from_this(), boost::asio::placeholders::error)); 
+
+      parse_message(message);
+
+      clean_buffer();
+
     } else {
       cout << "The host terminated the connection or there was an error. No more data will be read." << endl;
     }
   }
-
 
   void writeMessage(std::string message)
   {
@@ -74,26 +109,27 @@ public:
 
   void sendCreate(std::string data)
   {
-
+    cout << "Enter sendCreate." << endl;
     std::string msg;
     std::string name = "";
     std::string pass = "";  
     boost::system::error_code ec;  
    
     /* parse Name */
-    std::size_t pos1 = 1+data.find("Name:");
-    std::size_t pos2 = data.find(' ', pos1);
+    std::size_t pos1 = 5 + data.find("Name:");
+    std::size_t pos2 = data.find('\n', pos1);
     name = data.substr(pos1, pos2-pos1);
-    cout << "Name " << name << endl;
+    cout << "Name: " << name << endl; //REMOVE THIS
 
     /* parse password */
-    std::size_t p1 = 1+data.find("Password:");
-    std::size_t p2 = data.find(' ', p1);
+    std::size_t p1 = 9 + data.find("Password:");
+    std::size_t p2 = data.find('\n', p1);
     pass = data.substr(p1, p2-p1);
-    cout << "Password " << pass << endl;
-   
+    cout << "Password: " << pass << endl; //REMOVE THIS
+
+    bool create_success = create_spreadsheet(name, pass);
     std::string LF = "\n";
-    if (name == this->name && pass == this->password)  
+    if (create_success)  
       {
 	msg = "CREATE SP OK " + LF + "Name:" + name + " " + LF + "Password:" + pass + " " + LF;
 	writeMessage(msg);
@@ -119,20 +155,20 @@ public:
     boost::system::error_code ec;
 
     /* parse Name */
-    std::size_t pos1 = 1+data.find("Name:");
-    std::size_t pos2 = data.find(' ', pos1);
+    std::size_t pos1 = 5+data.find("Name:");
+    std::size_t pos2 = data.find('\n', pos1);
     name = data.substr(pos1, pos2-pos1);
     cout << "Name " << name << endl;
 
     /* parse password */
-    std::size_t p1 = 1+data.find("Password:");
-    std::size_t p2 = data.find(' ', p1);
+    std::size_t p1 = 9+data.find("Password:");
+    std::size_t p2 = data.find('\n', p1);
     pass = data.substr(p1, p2-p1);
     cout << "Password " << pass << endl;
 
 
-    /* if the request succeeded */
-    if (name == this->name && pass == this->password) 
+    bool create_success = join_spreadsheet(name, pass);
+    if (create_success) 
       {
 	msg = "JOIN SP OK " + LF + "Name:" + name + " " + LF + "Version:"
 	  + version + " " + LF + "Length:" + length + " " + LF + xml + LF;
@@ -338,82 +374,81 @@ public:
     writeMessage(toSend);
   }
 
-  void readData()
-{  
-  std::string message = buffer.data();
-  std::string lineData;
+  void parse_message(std::string message)
+  {  
+    /*
+    std::string lineData;
 
-  /*read a single line from a socket and into a string */ 
-  cout << "Line data from socket " << lineData << endl;
+    boost::asio::streambuf b;
+    std::istream is(&b);
+    std::getline(is, lineData);
+    */
 
-  int buffSize = sizeof(buffer);
+    /*read a single line from a socket and into a string */ 
 
-  int msg_length = strlen(buffer.data());
-  int i;
-  //Clean the buffer.
-  for (i=0; i<msg_length; i++)
-    buffer[i] = '\0';
+    int buffSize = strlen(message.c_str());
 
-  /* asynchronously read data into a streambuf until a LF 
-     buffer b contains the data
-     getline extracts the data into lineData
-  */
-  boost::asio::streambuf b;
-  std::istream is(&b);
-  std::getline(is, lineData);
-  //boost::asio::async_read_until(sock, b, '\n', read_handler);
+    /* asynchronously read data into a streambuf until a LF 
+       buffer b contains the data
+       getline extracts the data into lineData
+    */
 
-  sock.async_read_some(boost::asio::buffer(buffer), boost::bind(&client_connection::read_handler, shared_from_this(), boost::asio::placeholders::error));
-
-  cout << "Line data " << lineData << endl;
-  
-  /* call methods to parse data */
-  if (lineData != "\n" || message != "\n")
-    {
-     for(int i = 0; i < buffSize; i++)
-	{
-	   message += lineData[i];
-	}
+    /* call methods to parse data */
+    if ( message != "\n")
+      {/*
+	for(int i = 0; i < buffSize; i++)
+	  message += lineData[i];
+       */
+	  
      
-     cout << "Current line msg " << message << endl;
-     
-      if(message == "CREATE")
-	{
+	cout << "Message: " << message << endl;
+	//cout << lineData << endl;
+
+	int loc = message.find("\n");
+	if (loc ==  string::npos)
+	  return; //No SP found?
+	std::string command = message.substr(0, loc);
+	cout << "Command: " << command << endl;
+
+	if(command == "CREATE")
+	  sendCreate(message);
+	else if (command == "JOIN")
+	  sendJoin(message);
+	else if(command == "CHANGE")
+	  sendChange(message);
+	else if(command == "UNDO")
+	  sendUndo(message);
+	else if(command == "UPDATE")
+	    sendUpdate(message);
+	else if(command == "SAVE")
+	    sendSave(message);
+	else if (command == "LEAVE")
+	  {/* do not respond */}
+	else
+	    sendError(command);
+
+	/*
+	if(message == "CREATE")
 	  sendCreate(lineData);
-	}
-      else if (message == "JOIN")
-      {
-	 sendJoin(lineData);
-      }
-      else if(message == "CHANGE")
-      {
-	 sendChange(lineData);
-      }
-      else if(message == "UNDO")
-      {
-	 sendUndo(lineData);
-      }
-      else if(message == "UPDATE")
-      {
-	 sendUpdate(lineData);
-      }
-      else if(message == "SAVE")
-      {
-	 sendSave(lineData);
-      }
-      else if (message == "LEAVE")
-      {
-	 /* do not respond */
-      }
-      else
-      {
-	 sendError(lineData);
-      }
+	else if (message == "JOIN")
+	  sendJoin(lineData);
+	else if(message == "CHANGE")
+	  sendChange(lineData);
+	else if(message == "UNDO")
+	    sendUndo(lineData);
+	else if(message == "UPDATE")
+	    sendUpdate(lineData);
+	else if(message == "SAVE")
+	    sendSave(lineData);
+	else if (message == "LEAVE")
+	  {}
+	else
+	    sendError(lineData);
+*/
 
-      // boost::asio::async_read_some(sock, b, '\n', read_handler);
-	 sock.async_read_some(boost::asio::buffer(buffer), boost::bind(&client_connection::read_handler, shared_from_this(), boost::asio::placeholders::error));
-    }
-}
+	//sock.async_read_some(boost::asio::buffer(buffer), boost::bind(&client_connection::read_handler, shared_from_this(), boost::asio::placeholders::error));
+      }
+  }
 
   void write_handler(const boost::system::error_code &ec/*, std::size_t bytes_transferred*/) 
   { 
@@ -428,7 +463,6 @@ boost::asio::io_service io_service;
 boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::tcp::v4(), 1984); 
 boost::asio::ip::tcp::acceptor *acceptorptr; 
 
-typedef boost::unordered_map<std::string, spreadsheet> spreadsheet_map;
 spreadsheet_map spreadsheets;
 
 void load_spreadsheets() {
@@ -441,7 +475,7 @@ void load_spreadsheets() {
 	cout << file << endl; //REMOVE BEFORE DEPLOY
 	int dot = file.find(".");
 	file = file.substr(0, dot); //Remove .txt at the end
-	spreadsheet ss(file);
+	spreadsheet ss(file, "password");
 	spreadsheets.insert(std::make_pair(file, ss));
 	spreadsheet s1 = spreadsheets.at(file);
 	string sheetname = s1.get_name();
@@ -469,7 +503,7 @@ void accept_handler(const boost::system::error_code &ec, client_connection_ptr c
 
 
 void start_accept() {
-  client_connection_ptr new_connection(new client_connection(io_service));
+  client_connection_ptr new_connection(new client_connection(io_service, &spreadsheets));
   acceptorptr->listen();
   cout << "This server is now listening for connections." << endl; 
   acceptorptr->async_accept(new_connection->socket(), boost::bind(accept_handler, boost::asio::placeholders::error, new_connection));

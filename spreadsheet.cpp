@@ -1,11 +1,11 @@
 /*
- * This represents a spreadsheet object and provides functions for loading and saving into a file.
- */
-#include <string> 
-#include <fstream> 
-#include <iostream> 
+* This represents a spreadsheet object and provides functions for loading and saving into a file.
+*/
+#include <string>
+#include <fstream>
+#include <iostream>
 #include <boost/unordered_set.hpp>
-#include <sstream> 
+#include <sstream>
 
 #ifndef SPREADSHEET_HPP
 #define SPREADSHEET_HPP
@@ -18,18 +18,35 @@ using namespace std;
 typedef boost::unordered_map<std::string,std::string> hashmap;
 
 /*
- * Spreadsheet constructor.
- */
-spreadsheet::spreadsheet(string name) {
-  fileLocation = "spreadsheets/" + name;
+* Spreadsheet constructor.
+*/
+spreadsheet::spreadsheet(string name, string pass) {
+  fileLocation = "spreadsheets/" + name + ".txt";
   this->name = name;
   version = 0;
-  std::string pass = password;
+  password = pass;
   lastUpdate = pair<string,string>("","");
   undoStack.push(pair<string,string>("",""));
   push = true;
+  active_clients = 0;
 }
 
+
+int spreadsheet::get_active_clients() {
+  return active_clients;
+}
+
+
+void spreadsheet::add_active_client() {
+  active_clients++;
+}
+
+
+void spreadsheet::remove_active_client() {
+  active_clients--;
+}
+//Probably not necessary.
+/*
 spreadsheet& spreadsheet::operator=(const spreadsheet &rhs) {
   if (this == &rhs)
     return *this;
@@ -39,18 +56,18 @@ spreadsheet& spreadsheet::operator=(const spreadsheet &rhs) {
   this->cells = rhs.cells;
   this->password = rhs.password;
   return *this;
-}
+  }*/
 
 /*
- * Checks if a password matchs this spreadsheet's password.
- */
+* Checks if a password matchs this spreadsheet's password.
+*/
 bool spreadsheet::check_password(string pass) const {
   return (password == pass);
 }
 
 /*
- * Saves the spreadsheet to the file specific to this object.
- */
+* Saves the spreadsheet to the file specific to this object.
+*/
 void spreadsheet::save_spreadsheet() {
   fstream fs;
   fs.open(fileLocation.c_str(), std::fstream::out); //This will create the file if it doesn't exist.
@@ -61,10 +78,10 @@ void spreadsheet::save_spreadsheet() {
 }
 
 /*
- * Loads the spreadsheet into the file by the following spec:
- * Cells are arranged as you would see them in a spreadsheet, separated by tabs
- * for each column, and by lines for each row.
- */
+* Loads the spreadsheet into the file by the following spec:
+* Cells are arranged as you would see them in a spreadsheet, separated by tabs
+* for each column, and by lines for each row.
+*/
 void spreadsheet::load_spreadsheet() {
   fstream fs;
   fs.open(fileLocation.c_str(), std::fstream::in); //This will create the file if it doesn't exist.
@@ -78,11 +95,11 @@ void spreadsheet::load_spreadsheet() {
 
       tempint = temp.find("version=\""); //Find version info
       if (tempint == std::string::npos)
-	return; //Malformed.
+return; //Malformed.
       temp = temp.substr(tempint + 9);
       tempint = temp.find("\""); //Find ending quote
       if (tempint == std::string::npos)
-	return; //Malformed.
+return; //Malformed.
       version = atoi(temp.substr(0, tempint).c_str());
 
       //This should be the first cell.
@@ -90,36 +107,36 @@ void spreadsheet::load_spreadsheet() {
       std::getline(fs, temp, '>');
 
       while(temp == "cell") {
-	std::getline(fs, temp, '<');
-	std::getline(fs, temp, '>');
-	if (temp != "name")
-	  return; //Malformed.
-	std::getline(fs, temp, '<');
+std::getline(fs, temp, '<');
+std::getline(fs, temp, '>');
+if (temp != "name")
+return; //Malformed.
+std::getline(fs, temp, '<');
 
-	callnametemp = temp; //Cell name.
+callnametemp = temp; //Cell name.
 
-	std::getline(fs, temp, '>');
-	if (temp != "/name")
-	  return; //Malformed.
-	std::getline(fs, temp, '<');
-	std::getline(fs, temp, '>');
-	if (temp != "contents")
-	  return; //Malformed.
-	std::getline(fs, temp, '<');
+std::getline(fs, temp, '>');
+if (temp != "/name")
+return; //Malformed.
+std::getline(fs, temp, '<');
+std::getline(fs, temp, '>');
+if (temp != "contents")
+return; //Malformed.
+std::getline(fs, temp, '<');
 
-	cells[callnametemp] = temp; //Fill in cell contents.
+cells[callnametemp] = temp; //Fill in cell contents.
 
-	std::getline(fs, temp, '>');
-	if (temp != "/contents")
-	  return; //Malformed.
-	std::getline(fs, temp, '<');
-	std::getline(fs, temp, '>');
-	if (temp != "/cell")
-	  return; //Malformed.
+std::getline(fs, temp, '>');
+if (temp != "/contents")
+return; //Malformed.
+std::getline(fs, temp, '<');
+std::getline(fs, temp, '>');
+if (temp != "/cell")
+return; //Malformed.
 
-	//Read in the next cell.
-	std::getline(fs, temp, '<');
-	std::getline(fs, temp, '>');
+//Read in the next cell.
+std::getline(fs, temp, '<');
+std::getline(fs, temp, '>');
 
       }
     } catch (int e) {
@@ -127,19 +144,36 @@ void spreadsheet::load_spreadsheet() {
     }
   }
   fs.close();
-}  
+}
 
 /*
- * Updates the specified cell. If the cell is out of bounds, returns false;
- */
+* Updates the specified cell. If the cell is out of bounds, returns false;
+*/
 bool spreadsheet::try_update_cell(string cellname, string data) {
   cells[cellname] = data;
+
+  if( lastUpdate.first == "" && lastUpdate.second == "" )
+    {
+      // nothing to undo
+    }
+  else
+    {
+      if( push )
+	{
+	  // stores newest operation
+	  undoStack.push( lastUpdate );
+	}
+      push = true;
+    }
+  // lastUpdate now holds the previous operation
+  lastUpdate = pair<string,string>(cellname,data);
+
   return true;
 }
 
 /*
- * Returns the contents of a cell as a string.
- */
+* Returns the contents of a cell as a string.
+*/
 string spreadsheet::get_cell_data(string cellname) {
   if (cells.find(cellname) == cells.end())
     return NULL;
@@ -152,8 +186,8 @@ string spreadsheet::get_name() const{
 }
 
 /*
- * Generates an XML string representation of the spreadsheet.
- */
+* Generates an XML string representation of the spreadsheet.
+*/
 string spreadsheet::generate_xml() {
   hashmap::iterator iter;
   std::stringstream ss;
@@ -165,15 +199,15 @@ string spreadsheet::generate_xml() {
 }
 
 /*
- * Sets the version.
- */
+* Sets the version.
+*/
 void spreadsheet::set_version(int v) {
   this->version = v;
 }
 
 /*
- * Increments version number by 1.
- */
+* Increments version number by 1.
+*/
 void spreadsheet::increment_version() {
   this->version += 1;
 }
@@ -200,28 +234,36 @@ pair<string,string> spreadsheet::undo()
   return p;
 }
 
-/*
- * This is just a tester method. It should be removed prior to deployment.
- */
+
 
 /*
+* This is just a tester method. It should be removed prior to deployment.
+*/
+/*
 int main() {
-  cout << "Please specify filename of spreadsheet." << endl;
-  string filename;
-  cin >> filename;
-  spreadsheet ss(filename);
-  cout << "Spreadsheet created." << endl;
-  ss.load_spreadsheet();
-  cout << "Spreadsheet loaded." << endl;
-  ss.try_update_cell("A3", "NEW STRING!");
-  cout << "Cell updated." << endl;
-  ss.try_update_cell("C45", "Weeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee!");
-  cout << "Cell updated." << endl;
-  string data = ss.get_cell_data("A3");
-  cout << "Cell retrieved: " << data << endl;
-  ss.save_spreadsheet();
-  cout << "Spreadsheet saved." << endl;
-  return 0;
+  //printfiles();
+cout << "Please specify filename of spreadsheet." << endl;
+string filename;
+cin >> filename;
+ spreadsheet ss(filename,"password");
+cout << "Spreadsheet created." << endl;
+ss.load_spreadsheet();
+cout << "Spreadsheet loaded." << endl;
+ ss.try_update_cell("A3", "First");
+cout << "Cell updated." << endl;
+ ss.try_update_cell("A3", "Second");
+cout << "Cell updated." << endl;
+ ss.try_update_cell("A3", "Third");
+cout << "Cell updated." << endl;
+ss.try_update_cell("A3", "Fourth");
+cout << "Cell updated." << endl;
+ ss.undo();
+ ss.undo();
+string data = ss.get_cell_data("A3");
+cout << "Cell retrieved: " << data << endl;
+ss.save_spreadsheet();
+cout << "Spreadsheet saved." << endl;
+return 0;
 }
 
 */
