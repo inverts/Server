@@ -23,8 +23,14 @@ class client_connection
   : public boost::enable_shared_from_this<client_connection> 
 {
 private:
+typedef boost::shared_ptr<client_connection> client_connection_ptr;
   std::string current_spreadsheet; //The name of the current spreadsheet.
   std::string LF;
+  boost::asio::ip::tcp::socket sock; 
+  boost::array<char, 1024> buffer; //This is the buffer we use to read in messages.
+  std::string name;
+  spreadsheet_map *spreadsheets; //This is a hashmap of all the available spreadsheets.
+  std::list<client_connection_ptr> *peers;
 
   //Creates a new spreadsheet
   bool create_spreadsheet(string name, string password)
@@ -39,7 +45,7 @@ private:
 
   bool join_spreadsheet(string name, string password) {
     cout << "Initial current spreadsheet: " << current_spreadsheet << endl;
-    if (spreadsheets->find(name) != spreadsheets->end())
+    if (spreadsheets->find(name) == spreadsheets->end())
       return false; //Spreadsheet does not exist.
     if(!spreadsheets->at(name).check_password(password))
       return false; //Wrong password.
@@ -63,14 +69,13 @@ private:
     ss->increment_version();
     return CHANGE_SUCCESS;
   }
-
   bool save_spreadsheet(string name, string & fail_message)
   {
     if (name != this->name) {
       fail_message = "You are not currently editing that spreadsheet.";
       return false;
     }
-    if (spreadsheets->find(name) != spreadsheets->end()) {
+    if (spreadsheets->find(name) == spreadsheets->end()) {
       fail_message = "Spreadsheet does not exist.";
       return false;
     }
@@ -79,16 +84,15 @@ private:
 
   void leave_spreadsheet(string name){
     //What do we do if spreadsheet doesn't exist?
-    spreadsheets->at(name).remove_active_client();
+    if (spreadsheets->find(name) != spreadsheets->end()) {
+      spreadsheets->at(name).remove_active_client();
+    }
   }
 
-public:
-  boost::asio::ip::tcp::socket sock; 
-  boost::array<char, 1024> buffer; //This is the buffer we use to read in messages.
-  std::string name;
-  spreadsheet_map *spreadsheets; //This is a hashmap of all the available spreadsheets.
 
-  client_connection(boost::asio::io_service& io_service, spreadsheet_map *sheets)
+public:
+
+  client_connection(boost::asio::io_service& io_service, spreadsheet_map *sheets, std::list<client_connection_ptr> *connections)
     : sock(io_service)
   {
     //Creates new socket.
@@ -97,8 +101,12 @@ public:
     for (i=0; i<1024; i++)
       buffer[i] = '\0';
     spreadsheets = sheets;
-
+    peers = connections;
     LF =  "\n";
+  }
+
+  int num_peers() {
+    return peers->size();
   }
 
   boost::asio::ip::tcp::socket& socket()
@@ -114,10 +122,10 @@ public:
   }
 
   void clean_buffer() {
-      int length = strlen(buffer.data());
-      int i;
-      for (i=0; i<length; i++)
-	buffer[i] = '\0'; 
+    int length = strlen(buffer.data());
+    int i;
+    for (i=0; i<length; i++)
+      buffer[i] = '\0'; 
   }
   /*
    * Handles async_read calls.
@@ -146,6 +154,13 @@ public:
   { 
     sock.async_read_some(boost::asio::buffer(buffer), boost::bind(&client_connection::read_handler, shared_from_this(), boost::asio::placeholders::error)); //Continue reading message(s) from the socket.
   } 
+
+  void write_message_all(std::string message)
+  {
+    std::list<client_connection_ptr>::iterator it;
+    for (it=peers->begin(); it != peers->end(); ++it)
+      (*it)->writeMessage(message);
+  }
 
   /*
    * Writes a message and calls write_handler upon completion.
@@ -294,101 +309,94 @@ public:
       writeMessage(msg);
     }	
       
-
+    send_update(name, versNum, cellname, celldata);
+  
     //NOTE: If the change is successful, we also need to send an UPDATE to all clients!
   }
 
   void sendUndo(std::string data)
   {
-   std::string name;
-   std::string version;
-   std::string cell;
-   std::string length;
+    std::string name;
+    std::string version;
+    std::string cell;
+    std::string length;
 
-   /* NOT COMPLETE */
-   std::string content;
+    /* NOT COMPLETE */
+    std::string content;
 
-   std::string msg;
-   boost::system::error_code ec;
+    std::string msg;
+    boost::system::error_code ec;
 
    
-   /* parse Name */
-   std::size_t pos1 = 1+data.find("Name:");
-   std::size_t pos2 = data.find('\n', pos1);
-   name = data.substr(pos1, pos2-pos1);
-   if(DEBUG_MODE)
-     cout << "Name " << name << endl;
+    /* parse Name */
+    std::size_t pos1 = 1+data.find("Name:");
+    std::size_t pos2 = data.find('\n', pos1);
+    name = data.substr(pos1, pos2-pos1);
+    if(DEBUG_MODE)
+      cout << "Name " << name << endl;
 
-   /*parse version */
-   std::size_t pv = 1+data.find("Version:");
-   std::size_t pv2 = data.find('\n', pv);
-   version = data.substr(pv, pv2-pv);
+    /*parse version */
+    std::size_t pv = 1+data.find("Version:");
+    std::size_t pv2 = data.find('\n', pv);
+    version = data.substr(pv, pv2-pv);
  
-   string str = version;
-   int versNum;
-   istringstream (str) >> versNum;
+    string str = version;
+    int versNum;
+    istringstream (str) >> versNum;
 
-   if(DEBUG_MODE)
-     cout << "Version " << version << endl;
+    if(DEBUG_MODE)
+      cout << "Version " << version << endl;
 
-   //  /***************UPDATE COMMENTED SPREADSHEET ASPECTS***************
-   //    /* cell to revert */
-   // /* NOT COMPLETE */
-   //    cell = updatedCell;
-   //    //content = spreadsheet::get_cell_data(cell); 
+    //  /***************UPDATE COMMENTED SPREADSHEET ASPECTS***************
+    //    /* cell to revert */
+    // /* NOT COMPLETE */
+    //    cell = updatedCell;
+    //    //content = spreadsheet::get_cell_data(cell); 
    
    
-//    /* if the request succeeded */
-//    if (name == this->name && versNum == this->version)
-//    {
-//       msg = "UNDO SP OK " + LF + "Name:" + name + " " + LF +
-// 	 "Version:" + version + " " + LF + "Cell:" + cell + " " +
-// 	 LF + "Length:" + length + " " + LF + content + " " + LF;
-//       writeMessage(msg);
-//    }  
-//    /* if no unsaved changes */      
-//    else if (spreadsheet::get_cell_data(cell) == content && name == this->name && versNum == this->version)
-//    {
-//       msg = "UNDO SP END " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
-//       writeMessage(msg);
-//    }
-//    /* if version is out of date */
-//    else if (this-> != versNum && name == this->name)
-//    {
-//       msg = "UNDO SP WAIT " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
-//       writeMessage(msg); 
-//    }   
-//    else
-//    {
-//       msg = "UNDO SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
-//       writeMessage(msg);
-//    }
+    //    /* if the request succeeded */
+    //    if (name == this->name && versNum == this->version)
+    //    {
+    //       msg = "UNDO SP OK " + LF + "Name:" + name + " " + LF +
+    // 	 "Version:" + version + " " + LF + "Cell:" + cell + " " +
+    // 	 LF + "Length:" + length + " " + LF + content + " " + LF;
+    //       writeMessage(msg);
+    //    }  
+    //    /* if no unsaved changes */      
+    //    else if (spreadsheet::get_cell_data(cell) == content && name == this->name && versNum == this->version)
+    //    {
+    //       msg = "UNDO SP END " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
+    //       writeMessage(msg);
+    //    }
+    //    /* if version is out of date */
+    //    else if (this-> != versNum && name == this->name)
+    //    {
+    //       msg = "UNDO SP WAIT " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
+    //       writeMessage(msg); 
+    //    }   
+    //    else
+    //    {
+    //       msg = "UNDO SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
+    //       writeMessage(msg);
+    //    }
 
   }
 
-  void sendUpdate(std::string data)
+  void send_update(std::string spreadsheet_name, int version, std::string cellname, std::string celldata)
   {
-
-   /* NOT COMPLETE - NEED PRIV MEM VARS FOR EACH */
-   std::string name = "";
-   int version = 0;
-   std::string cell = "";
-   std::string length = "";
-   std::string cellContent = "";
-   std::string msg;
-   boost::system::error_code ec;
-
-   name = this->name;
-   version = spreadsheets->at(name).get_version();
-
-/* NOT COMPLETE */
-   //cell = updatedCell;
-   //cellContent = spreadsheet::get_cell_data(cell);
-   //length = strlen(cellContent);
-
-   // msg = "UPDATE " + LF + "Name:" + name + " " + LF + "Version:" + version + " " 
-   //    + LF + "Cell:" + cell + " " + LF + cellContent + " " + LF;
-   // writeMessage(msg);
+    std::stringstream ss;
+    ss << spreadsheets->at(spreadsheet_name).get_version();
+    std::string version_string = ss.str();
+    ss.flush();
+    ss << strlen(celldata.c_str());
+    std::string length_string = ss.str();
+    std::string msg = "UPDATE " + LF + 
+      "Name:" + name + " " + LF + 
+      "Version:" + version_string + " " + LF + 
+      "Cell:" + cellname + " " + LF + 
+      "Length:" + length_string + " " + LF + 
+      celldata + " " + LF;
+    write_message_all(msg);
   }
 
 
@@ -456,10 +464,15 @@ public:
 
 };
 
+
+
 boost::asio::io_service io_service; 
 boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::tcp::v4(), 1984); 
 boost::asio::ip::tcp::acceptor *acceptorptr; 
 spreadsheet_map spreadsheets;
+
+typedef boost::shared_ptr<client_connection> client_connection_ptr;
+std::list<client_connection_ptr> active_connections;
 
 void load_spreadsheets() {
   DIR *dir;
@@ -487,21 +500,23 @@ void load_spreadsheets() {
 }
 
 void start_accept(); //Forward declaration
-typedef boost::shared_ptr<client_connection> client_connection_ptr;
 
 void accept_handler(const boost::system::error_code &ec, client_connection_ptr connection) 
 { 
   if (!ec) 
     { 
       cout << "New incoming connection received." << endl;
+      cout << "Peers before: " << connection->num_peers() << endl;
+      active_connections.push_back(connection);
       connection->start();
+      cout << "Peers after: " << connection->num_peers() << endl;
     } 
   start_accept(); //Listen for more connections.
 } 
 
 
 void start_accept() {
-  client_connection_ptr new_connection(new client_connection(io_service, &spreadsheets));
+  client_connection_ptr new_connection(new client_connection(io_service, &spreadsheets, &active_connections));
   acceptorptr->listen();
   cout << "This server is now listening for connections." << endl; 
   acceptorptr->async_accept(new_connection->socket(), boost::bind(accept_handler, boost::asio::placeholders::error, new_connection));

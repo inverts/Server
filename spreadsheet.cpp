@@ -224,7 +224,7 @@ pair<string,string> spreadsheet::undo()
   // if nothing has changed
   if( undoStack.top().first == "" && undoStack.top().second == "" )
     {
-      // do nothing?
+      // do nothing? return null? let the method caller know there are no changes to be undone.
     }
   else
     {
