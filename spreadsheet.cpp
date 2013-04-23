@@ -46,8 +46,7 @@ void spreadsheet::remove_active_client() {
   active_clients--;
 }
 //Probably not necessary.
-/*
-spreadsheet& spreadsheet::operator=(const spreadsheet &rhs) {
+/*spreadsheet& spreadsheet::operator=(const spreadsheet &rhs) {
   if (this == &rhs)
     return *this;
   this->name = rhs.name;
@@ -72,9 +71,7 @@ void spreadsheet::save_spreadsheet() {
   fstream fs;
   fs.open(fileLocation.c_str(), std::fstream::out); //This will create the file if it doesn't exist.
   fs << generate_xml();
-
   fs.close();
-
 }
 
 /*
@@ -93,50 +90,52 @@ void spreadsheet::load_spreadsheet() {
       std::getline(fs, temp, '<');
       std::getline(fs, temp, '>');
 
-      tempint = temp.find("version=\""); //Find version info
+      tempint = temp.find("password=\""); //Find version info
       if (tempint == std::string::npos)
-return; //Malformed.
-      temp = temp.substr(tempint + 9);
+	return; //Malformed.
+      temp = temp.substr(tempint + 10);
       tempint = temp.find("\""); //Find ending quote
       if (tempint == std::string::npos)
-return; //Malformed.
-      version = atoi(temp.substr(0, tempint).c_str());
+	return; //Malformed.
+      //version = atoi(temp.substr(0, tempint).c_str());
+
+      this->password = temp.substr(0, tempint);
 
       //This should be the first cell.
       std::getline(fs, temp, '<');
       std::getline(fs, temp, '>');
 
       while(temp == "cell") {
-std::getline(fs, temp, '<');
-std::getline(fs, temp, '>');
-if (temp != "name")
-return; //Malformed.
-std::getline(fs, temp, '<');
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+	if (temp != "name")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
 
-callnametemp = temp; //Cell name.
+	callnametemp = temp; //Cell name.
 
-std::getline(fs, temp, '>');
-if (temp != "/name")
-return; //Malformed.
-std::getline(fs, temp, '<');
-std::getline(fs, temp, '>');
-if (temp != "contents")
-return; //Malformed.
-std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+	if (temp != "/name")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+	if (temp != "contents")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
 
-cells[callnametemp] = temp; //Fill in cell contents.
+	cells[callnametemp] = temp; //Fill in cell contents.
 
-std::getline(fs, temp, '>');
-if (temp != "/contents")
-return; //Malformed.
-std::getline(fs, temp, '<');
-std::getline(fs, temp, '>');
-if (temp != "/cell")
-return; //Malformed.
+	std::getline(fs, temp, '>');
+	if (temp != "/contents")
+	  return; //Malformed.
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
+	if (temp != "/cell")
+	  return; //Malformed.
 
-//Read in the next cell.
-std::getline(fs, temp, '<');
-std::getline(fs, temp, '>');
+	//Read in the next cell.
+	std::getline(fs, temp, '<');
+	std::getline(fs, temp, '>');
 
       }
     } catch (int e) {
@@ -147,24 +146,19 @@ std::getline(fs, temp, '>');
 }
 
 /*
-* Updates the specified cell. If the cell is out of bounds, returns false;
-*/
+ * Updates the specified cell. If the cell is out of bounds, returns false;
+ */
 bool spreadsheet::try_update_cell(string cellname, string data) {
+
   cells[cellname] = data;
 
-  if( lastUpdate.first == "" && lastUpdate.second == "" )
+  if( lastUpdate.first != "" || lastUpdate.second != "" )
     {
-      // nothing to undo
-    }
-  else
-    {
-      if( push )
-	{
-	  // stores newest operation
+      if( push ) // stores newest operation
 	  undoStack.push( lastUpdate );
-	}
       push = true;
     }
+
   // lastUpdate now holds the previous operation
   lastUpdate = pair<string,string>(cellname,data);
 
@@ -191,7 +185,7 @@ string spreadsheet::get_name() const{
 string spreadsheet::generate_xml() {
   hashmap::iterator iter;
   std::stringstream ss;
-  ss << "<spreadsheet version=\"" << version << "\">\n";
+  ss << "<spreadsheet password=\"" << password << "\">\n";
   for (iter = cells.begin(); iter != cells.end(); iter++) {
    ss << "<cell><name>" << iter->first << "</name><contents>" << iter->second << "</contents></cell>\n";
   }
@@ -203,6 +197,13 @@ string spreadsheet::generate_xml() {
 */
 void spreadsheet::set_version(int v) {
   this->version = v;
+}
+
+/*
+* Gets the version.
+*/
+int spreadsheet::get_version() {
+  return this->version;
 }
 
 /*

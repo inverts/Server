@@ -25,11 +25,12 @@ private:
 public:
   spreadsheet(string file, string pass);
 
-  spreadsheet& operator=(const spreadsheet &rhs);
-
+  //spreadsheet& operator=(const spreadsheet &rhs);
 
   int get_active_clients();
+
   void add_active_client();
+
   void remove_active_client();
 
   bool check_password(string password) const;
@@ -46,7 +47,9 @@ public:
 
   string generate_xml();
 
-  void set_version(int v);
+  void set_version(int v); //Deprecated.
+
+  int get_version();
 
   void increment_version();
 
