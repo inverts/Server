@@ -123,7 +123,6 @@ void spreadsheet::load_spreadsheet() {
 	if (temp != "contents")
 	  return; //Malformed.
 	std::getline(fs, temp, '<');
-
 	cells[callnametemp] = temp; //Fill in cell contents.
 
 	std::getline(fs, temp, '>');
@@ -187,10 +186,28 @@ string spreadsheet::get_name() const{
 string spreadsheet::generate_xml() {
   hashmap::iterator iter;
   std::stringstream ss;
-  ss << "<spreadsheet password=\"" << password << "\">\n";
+  ss << "<spreadsheet password=\"" << password << "\">";
   for (iter = cells.begin(); iter != cells.end(); iter++) {
-   ss << "<cell><name>" << iter->first << "</name><contents>" << iter->second << "</contents></cell>\n";
+    cout <<"Test Second: " << iter->second << endl;
+   ss << "<cell><name>" << iter->first << "</name><contents>" << iter->second << "</contents></cell>";
   }
+  ss << "</spreadsheet>";
+  return ss.str();
+}
+
+
+/*
+* Generates an XML string representation of the spreadsheet.
+*/
+string spreadsheet::generate_xml_to_spec() {
+  hashmap::iterator iter;
+  std::stringstream ss;
+  ss << "<?xml version=\"1.0\" encoding=\"utf-8\"?><spreadsheet>";
+  for (iter = cells.begin(); iter != cells.end(); iter++) {
+    cout <<"Test Second: " << iter->second << endl;
+   ss << "<cell><name>" << iter->first << "</name><contents>" << iter->second << "</contents></cell>";
+  }
+  ss << "</spreadsheet>";
   return ss.str();
 }
 

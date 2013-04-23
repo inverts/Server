@@ -47,6 +47,8 @@ public:
 
   string generate_xml();
 
+  string generate_xml_to_spec();
+
   void reset_version();
 
   int get_version();

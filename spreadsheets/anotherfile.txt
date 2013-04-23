@@ -1,3 +1,0 @@
-<spreadsheet version="0">
-<cell><name>A3</name><contents>NEW STRING!</contents></cell>
-<cell><name>C45</name><contents>Weeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee!</contents></cell>
