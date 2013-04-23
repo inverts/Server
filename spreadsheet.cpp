@@ -24,6 +24,10 @@ spreadsheet::spreadsheet(string name) {
   fileLocation = "spreadsheets/" + name;
   this->name = name;
   version = 0;
+  std::string pass = password;
+  lastUpdate = pair<string,string>("","");
+  undoStack.push(pair<string,string>("",""));
+  push = true;
 }
 
 spreadsheet& spreadsheet::operator=(const spreadsheet &rhs) {
@@ -174,7 +178,27 @@ void spreadsheet::increment_version() {
   this->version += 1;
 }
 
+/*
+ * undos the last action to the spreadsheet
+ */
+pair<string,string> spreadsheet::undo()
+{
+  pair<string,string> p = undoStack.top();
+  // if nothing has changed
+  if( undoStack.top().first == "" && undoStack.top().second == "" )
+    {
+      // do nothing?
+    }
+  else
+    {
+      undoStack.pop(); // takes off last changed cell/data 
+      push = false; // tells the stack not to push lastUpdate
+      try_update_cell(p.first,p.second); // updates last cell to previous state
+      
+    }
 
+  return p;
+}
 
 /*
  * This is just a tester method. It should be removed prior to deployment.

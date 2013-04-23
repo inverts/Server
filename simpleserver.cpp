@@ -22,7 +22,10 @@ public:
   boost::array<char, 1024> buffer; //This is the buffer we use to read in messages.
   std::string updatedCell;
   std::string name;
+  std::string password;
   int version;
+  //spreadsheet ss(std::string buffer.data());
+  //spreadsheet::spreadsheet userSp(name,password);
 
   client_connection(boost::asio::io_service& io_service)
     : sock(io_service)
@@ -71,6 +74,7 @@ public:
 
   void sendCreate(std::string data)
   {
+
     std::string msg;
     std::string name = "";
     std::string pass = "";  
@@ -89,29 +93,26 @@ public:
     cout << "Password " << pass << endl;
    
     std::string LF = "\n";
-    if (!ec)
+    if (name == this->name && pass == this->password)  
       {
 	msg = "CREATE SP OK " + LF + "Name:" + name + " " + LF + "Password:" + pass + " " + LF;
-	cout << "MSG!!!! " << msg << endl;
 	writeMessage(msg);
       }
     else
       {
-
-	/*********** NEED TO FIX FAIL MESSAGE *************/
 	msg = "CREATE SP FAIL " + LF + "Name:" + name + LF + "Request failed " + LF;
 	writeMessage(msg);
       }
-  
   }
 
   void sendJoin(std::string data)
   {
+
     std::string name = "";
     std::string pass = "";
     std::string version = "TEMP VERSION";
     std::string length = "TEMP LENGTH";
-    std::string xml = "TEMP XML";
+    std::string xml = "TEMP";
     std::string msg;
     std::string LF = "\n";
   
@@ -129,11 +130,13 @@ public:
     pass = data.substr(p1, p2-p1);
     cout << "Password " << pass << endl;
 
-    if (!ec)
+
+    /* if the request succeeded */
+    if (name == this->name && pass == this->password) 
       {
 	msg = "JOIN SP OK " + LF + "Name:" + name + " " + LF + "Version:"
 	  + version + " " + LF + "Length:" + length + " " + LF + xml + LF;
-	cout << "MSG!!!!" << msg << endl;
+      
 	writeMessage(msg);
       }
     else
@@ -141,10 +144,12 @@ public:
 	msg = "JOIN SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
 	writeMessage(msg);
       }  
+
   }
 
   void sendChange(std::string data)
   {
+
     std::string name = ""; 
     std::string version = "";
     std::string cell = "";
@@ -164,6 +169,11 @@ public:
     std::size_t pv = 1+data.find("Version:");
     std::size_t pv2 = data.find('\n', pv);
     version = data.substr(pv, pv2-pv);
+    
+    string str = version;
+    int versNum;
+    istringstream (str) >> versNum;
+
     cout << "Version " << version << endl;
 
     /*parse cell */
@@ -180,29 +190,37 @@ public:
     length = data.substr(pl, pl2-pl);
     cout << "Length " << length << endl;
    
-    /* NOT COMPLETE */
-    if (!ec)
-      {      
-	msg = "CHANGE SP OK " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
-	writeMessage(msg);
-	/* ADD WAIT MSG */
-      }
+    /* If request succeeded */
+    if (name == this->name && versNum == this->version && cell == updatedCell)
+    {      
+       msg = "CHANGE SP OK " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
+       writeMessage(msg);	
+    }
+    /* if the client's version is out of date */
+    else if (versNum != this->version && name == this->name)
+    {
+       msg = "CHANGE SP WAIT " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
+       writeMessage(msg);
+    }
+    /* if there are any other errors */
     else
-      {
-	msg = "CHANGE SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
-	writeMessage(msg);
-      }
+    {
+       msg = "CHANGE SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
+       writeMessage(msg);
+    }
+
   }
 
   void sendUndo(std::string data)
   {
-    std::string name = "";
+
+   std::string name = "";
    std::string version = "";
    std::string cell = "";
    std::string length = "";
 
    /* NOT COMPLETE */
-   std::string content = "TEMP CONTENT";
+   std::string content;
 
    std::string msg;
    std::string LF = "\n";
@@ -219,52 +237,54 @@ public:
    std::size_t pv = 1+data.find("Version:");
    std::size_t pv2 = data.find('\n', pv);
    version = data.substr(pv, pv2-pv);
+ 
+    string str = version;
+    int versNum;
+    istringstream (str) >> versNum;
+
    cout << "Version " << version << endl;
 
-   /***************UPDATE COMMENTED SPREADSHEET ASPECTS***************
-   /* cell to revert */
-/* NOT COMPLETE */
-   cell = updatedCell;
-   // content = spreadsheet::get_cell_data(cell); 
+  //  /***************UPDATE COMMENTED SPREADSHEET ASPECTS***************
+//    /* cell to revert */
+// /* NOT COMPLETE */
+//    cell = updatedCell;
+//    //content = spreadsheet::get_cell_data(cell); 
    
    
-   //   if (!ec)
-   // {
-   //    /* if request succeeded */
-   //    if (spreadsheet::try_update_cell(cell, content))
-   //    {
-   // 	 msg = "UNDO SP OK " + LF + "Name:" + name + " " + LF +
-   // 	    "Version:" + version + " " + LF + "Cell:" + cell + " " +
-   // 	    LF + "Length:" + length + " " + LF + content + " " + LF;
-   // 	 writeMessage(msg);
-   //    }
+//    /* if the request succeeded */
+//    if (name == this->name && versNum == this->version)
+//    {
+//       msg = "UNDO SP OK " + LF + "Name:" + name + " " + LF +
+// 	 "Version:" + version + " " + LF + "Cell:" + cell + " " +
+// 	 LF + "Length:" + length + " " + LF + content + " " + LF;
+//       writeMessage(msg);
+//    }  
+//    /* if no unsaved changes */      
+//    else if (spreadsheet::get_cell_data(cell) == content && name == this->name && versNum == this->version)
+//    {
+//       msg = "UNDO SP END " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
+//       writeMessage(msg);
+//    }
+//    /* if version is out of date */
+//    else if (this-> != versNum && name == this->name)
+//    {
+//       msg = "UNDO SP WAIT " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
+//       writeMessage(msg); 
+//    }   
+//    else
+//    {
+//       msg = "UNDO SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
+//       writeMessage(msg);
+//    }
 
-   //    /* if no unsaved changes */      
-   //    if (spreadsheet::get_cell_data(cell) == content)
-   //    {
-   // 	 msg = "UNDO SP END " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
-   // 	 writeMessage(msg);
-   //    }
-
-   //    /* if version is out of date */
-   //    if (this-> != version)
-   //    {
-   // 	 msg = "UNDO SP WAIT " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
-   // 	 writeMessage(msg); 
-   //    }
-   // }
-   // else
-   // {
-   //    msg = "UNDO SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
-   //    writeMessage(msg);
-   // }
   }
 
   void sendUpdate(std::string data)
   {
+
    /* NOT COMPLETE - NEED PRIV MEM VARS FOR EACH */
    std::string name = "";
-   std::string version = "";
+   int version = 0;
    std::string cell = "";
    std::string length = "";
    std::string cellContent = "";
@@ -279,10 +299,11 @@ public:
    //cellContent = spreadsheet::get_cell_data(cell);
    //length = strlen(cellContent);
 
-   msg = "UPDATE " + LF + "Name:" + name + " " + LF + "Version:" + version + " " 
-      + LF + "Cell:" + cell + " " + LF + cellContent + " " + LF;
-   writeMessage(msg);
+   // msg = "UPDATE " + LF + "Name:" + name + " " + LF + "Version:" + version + " " 
+   //    + LF + "Cell:" + cell + " " + LF + cellContent + " " + LF;
+   // writeMessage(msg);
   }
+
 
   void sendSave(std::string data)
   {
@@ -297,11 +318,13 @@ public:
     name = data.substr(pos1, pos2-pos1);
     cout << "Name " << name << endl;
 
-    if (!ec)
+    /* if request succeeded */
+    if (name == this->name)
       {
 	msg = "SAVE SP OK " + LF + "Name:" + name + " " + LF;
 	writeMessage(msg);
       }
+    /* if the request fails */
     else
       {
 	msg = "SAVE SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
@@ -324,6 +347,12 @@ public:
   cout << "Line data from socket " << lineData << endl;
 
   int buffSize = sizeof(buffer);
+
+  int msg_length = strlen(buffer.data());
+  int i;
+  //Clean the buffer.
+  for (i=0; i<msg_length; i++)
+    buffer[i] = '\0';
 
   /* asynchronously read data into a streambuf until a LF 
      buffer b contains the data

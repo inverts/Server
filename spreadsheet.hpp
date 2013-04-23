@@ -3,6 +3,7 @@
  */
 
 #include <boost/unordered_map.hpp>
+#include <stack>
 using namespace std;
 
 
@@ -11,11 +12,15 @@ typedef boost::unordered_map<std::string,std::string> hashmap;
 class spreadsheet {
 
 private:
-  std::string fileLocation; //We must store the file location for this spreadsheet.
+ std::string fileLocation; //We must store the file location for this spreadsheet.
   hashmap cells;
   std::string name;
   std::string password;
   int version;
+  std::stack< std::pair<std::string,std::string> > undoStack;
+  pair<string,string> lastUpdate;
+  bool push;
+
 
 public:
   spreadsheet(string file);
@@ -39,5 +44,7 @@ public:
   void set_version(int v);
 
   void increment_version();
+
+  pair<string,string> undo();
 
 };
