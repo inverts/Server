@@ -47,7 +47,7 @@ public:
 
   string generate_xml();
 
-  void set_version(int v); //Deprecated.
+  void reset_version();
 
   int get_version();
 

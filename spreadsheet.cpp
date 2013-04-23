@@ -21,14 +21,15 @@ typedef boost::unordered_map<std::string,std::string> hashmap;
 * Spreadsheet constructor.
 */
 spreadsheet::spreadsheet(string name, string pass) {
-  fileLocation = "spreadsheets/" + name + ".txt";
+  fileLocation = "spreadsheets/" + name + ".ss";
   this->name = name;
   version = 0;
+  active_clients = 0;
   password = pass;
   lastUpdate = pair<string,string>("","");
   undoStack.push(pair<string,string>("",""));
   push = true;
-  active_clients = 0;
+  load_spreadsheet(); //If the spreadsheet already exists, this will load in the data and the password.
 }
 
 
@@ -146,16 +147,17 @@ void spreadsheet::load_spreadsheet() {
 }
 
 /*
- * Updates the specified cell. If the cell is out of bounds, returns false;
+ * Updates the specified cell.
+ * Boolean return value is in case we have some sort of cell validation in the future.
  */
 bool spreadsheet::try_update_cell(string cellname, string data) {
-
+  string tmp = cells[cellname]; // stores data
   cells[cellname] = data;
 
   if( lastUpdate.first != "" || lastUpdate.second != "" )
     {
       if( push ) // stores newest operation
-	  undoStack.push( lastUpdate );
+	undoStack.push( pair<string,string>(cellname,tmp) );
       push = true;
     }
 
@@ -195,8 +197,8 @@ string spreadsheet::generate_xml() {
 /*
 * Sets the version.
 */
-void spreadsheet::set_version(int v) {
-  this->version = v;
+void spreadsheet::reset_version() {
+  this->version = 0;
 }
 
 /*
@@ -246,7 +248,7 @@ int main() {
 cout << "Please specify filename of spreadsheet." << endl;
 string filename;
 cin >> filename;
- spreadsheet ss(filename,"password");
+ spreadsheet ss(filename,"fake");
 cout << "Spreadsheet created." << endl;
 ss.load_spreadsheet();
 cout << "Spreadsheet loaded." << endl;
@@ -266,5 +268,5 @@ ss.save_spreadsheet();
 cout << "Spreadsheet saved." << endl;
 return 0;
 }
-
 */
+

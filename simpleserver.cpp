@@ -40,10 +40,13 @@ private:
   bool join_spreadsheet(string name, string password) {
     cout << "Initial current spreadsheet: " << current_spreadsheet << endl;
     if (spreadsheets->find(name) != spreadsheets->end())
-      return false; //This spreadsheet already exists.
+      return false; //Spreadsheet does not exist.
     if(!spreadsheets->at(name).check_password(password))
       return false; //Wrong password.
     current_spreadsheet = name;
+    if(spreadsheets->at(name).get_active_clients() < 1)
+      spreadsheets->at(name).reset_version();
+    spreadsheets->at(name).add_active_client();
     cout << "Current spreadsheet changed to: " << current_spreadsheet << endl;
   }
 
@@ -61,13 +64,28 @@ private:
     return CHANGE_SUCCESS;
   }
 
+  bool save_spreadsheet(string name, string & fail_message)
+  {
+    if (name != this->name) {
+      fail_message = "You are not currently editing that spreadsheet.";
+      return false;
+    }
+    if (spreadsheets->find(name) != spreadsheets->end()) {
+      fail_message = "Spreadsheet does not exist.";
+      return false;
+    }
+    spreadsheets->at(name).save_spreadsheet();
+  }
+
+  void leave_spreadsheet(string name){
+    //What do we do if spreadsheet doesn't exist?
+    spreadsheets->at(name).remove_active_client();
+  }
+
 public:
   boost::asio::ip::tcp::socket sock; 
   boost::array<char, 1024> buffer; //This is the buffer we use to read in messages.
-  //std::string updatedCell;
   std::string name;
-  std::string password; //DELETE
-  //  int version;
   spreadsheet_map *spreadsheets; //This is a hashmap of all the available spreadsheets.
 
   client_connection(boost::asio::io_service& io_service, spreadsheet_map *sheets)
@@ -175,13 +193,10 @@ public:
 
     std::string name;
     std::string pass;
-    std::string version;
-    std::string length;
-    std::string msg;
   
     boost::system::error_code ec;
 
-    /* parse Name */
+    /* parse name */
     std::size_t pos1 = 5+data.find("Name:");
     std::size_t pos2 = data.find('\n', pos1);
     name = data.substr(pos1, pos2-pos1);
@@ -194,9 +209,19 @@ public:
     cout << "Password: " << pass << endl;
 
     bool create_success = join_spreadsheet(name, pass);
+    std::string msg;
     if (create_success) 
       {
+	std::stringstream ss;
+	ss << spreadsheets->at(name).get_version();
+	std::string version = ss.str();
+	ss.flush();
+
 	std::string xml = spreadsheets->at(name).generate_xml();
+
+	ss << strlen(xml.c_str());
+	std::string length = ss.str();
+
 	msg = "JOIN SP OK " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF + "Length:" + length + " " + LF + xml + LF;
 	writeMessage(msg);
       }
@@ -245,8 +270,6 @@ public:
     if(DEBUG_MODE)
       cout << "Cell: " << cellname << endl;
 
-    //updatedCell = cell;
-
     /*parse length */
     std::size_t pl = 1+data.find("Length:");
     std::size_t pl2 = data.find('\n', pl);
@@ -277,11 +300,10 @@ public:
 
   void sendUndo(std::string data)
   {
-
-   std::string name = "";
-   std::string version = "";
-   std::string cell = "";
-   std::string length = "";
+   std::string name;
+   std::string version;
+   std::string cell;
+   std::string length;
 
    /* NOT COMPLETE */
    std::string content;
@@ -294,24 +316,26 @@ public:
    std::size_t pos1 = 1+data.find("Name:");
    std::size_t pos2 = data.find('\n', pos1);
    name = data.substr(pos1, pos2-pos1);
-   cout << "Name " << name << endl;
+   if(DEBUG_MODE)
+     cout << "Name " << name << endl;
 
    /*parse version */
    std::size_t pv = 1+data.find("Version:");
    std::size_t pv2 = data.find('\n', pv);
    version = data.substr(pv, pv2-pv);
  
-    string str = version;
-    int versNum;
-    istringstream (str) >> versNum;
+   string str = version;
+   int versNum;
+   istringstream (str) >> versNum;
 
-   cout << "Version " << version << endl;
+   if(DEBUG_MODE)
+     cout << "Version " << version << endl;
 
-  //  /***************UPDATE COMMENTED SPREADSHEET ASPECTS***************
-//    /* cell to revert */
-// /* NOT COMPLETE */
-//    cell = updatedCell;
-//    //content = spreadsheet::get_cell_data(cell); 
+   //  /***************UPDATE COMMENTED SPREADSHEET ASPECTS***************
+   //    /* cell to revert */
+   // /* NOT COMPLETE */
+   //    cell = updatedCell;
+   //    //content = spreadsheet::get_cell_data(cell); 
    
    
 //    /* if the request succeeded */
@@ -380,8 +404,9 @@ public:
     name = data.substr(pos1, pos2-pos1);
     cout << "Name " << name << endl;
 
+    std::string fail_message = "";
     /* if request succeeded */
-    if (name == this->name)
+    if (save_spreadsheet(name, fail_message))
       {
 	msg = "SAVE SP OK " + LF + "Name:" + name + " " + LF;
 	writeMessage(msg);
@@ -389,7 +414,7 @@ public:
     /* if the request fails */
     else
       {
-	msg = "SAVE SP FAIL " + LF + "Name:" + name + " " + LF + "FAIL MESSAGE " + LF;
+	msg = "SAVE SP FAIL " + LF + "Name:" + name + " " + LF + fail_message + " " + LF;
 	writeMessage(msg);
       }
   }
@@ -446,8 +471,8 @@ void load_spreadsheets() {
       string file = ent->d_name;
       if (file!="." && file != "..") {
 	int dot = file.find(".");
-	file = file.substr(0, dot); //Remove .txt at the end
-	spreadsheet ss(file, "password");
+	file = file.substr(0, dot); //Remove .* at the end
+	spreadsheet ss(file, "");
 	spreadsheets.insert(std::make_pair(file, ss));
 	spreadsheet s1 = spreadsheets.at(file);
 	string sheetname = s1.get_name();
