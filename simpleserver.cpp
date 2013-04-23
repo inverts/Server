@@ -86,6 +86,9 @@ typedef boost::shared_ptr<client_connection> client_connection_ptr;
   {
     if (this->current_spreadsheet != name)
       return CHANGE_FAIL; //This client doesn't have a session with that spreadsheet.
+    if (DEBUG_MODE) {
+      cout << "Version attempt: " << version << endl << "Current version: " << spreadsheets->at(name).get_version();
+    }
     if (version != spreadsheets->at(name).get_version())
       return CHANGE_WAIT; //Incorrect version number.
     if(!spreadsheets->at(name).try_update_cell(cellname, data))
@@ -139,6 +142,7 @@ typedef boost::shared_ptr<client_connection> client_connection_ptr;
     } else {
       cellname = result.first;
       celldata = result.second;
+      spreadsheets->at(this->current_spreadsheet).increment_version();
       return UNDO_OK;
     }
   }
@@ -413,7 +417,6 @@ public:
     int versNum;
     istringstream (str) >> versNum;
       
-
     if(DEBUG_MODE)
       cout << "Version: " << version << endl;
 
@@ -437,8 +440,7 @@ public:
 
     int chg_success(change_spreadsheet(name, versNum, cellname,  celldata));
 
-    if (chg_success==CHANGE_SUCCESS) {
-       //msg = "CHANGE SP OK " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;       
+    if (chg_success==CHANGE_SUCCESS) {     
        msg.append("CHANGE SP OK");
        msg.push_back('\0');
        msg.append("Name:");
@@ -448,10 +450,7 @@ public:
        msg.append(version);
        msg.push_back('\0');
        writeMessage(msg);
-       writeMessage(msg);
     } else if (chg_success==CHANGE_WAIT) {
-       // msg = "CHANGE SP WAIT " + LF + "Name:" + name + " " + LF + "Version:" + version + " " + LF;
-
        msg.append("CHANGE SP WAIT");
        msg.push_back('\0');
        msg.append("Name:");
@@ -541,13 +540,18 @@ public:
      stream << length;
      std::string len;
      len = stream.str();
+
+     std::stringstream stream2;
+     stream2 << spreadsheets->at(name).get_version();
+     std::string vers = stream2.str();
+
      msg.append("UNDO SP OK");
      msg.push_back('\0');
      msg.append("Name:");
      msg.append(name);
      msg.push_back('\0');
      msg.append("Version:");
-     msg.append(version);  
+     msg.append(vers);  
      msg.append("Cell:");
      msg.append(cellname);
      msg.push_back('\0');

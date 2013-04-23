@@ -1,1 +1,0 @@
-<spreadsheet password="password"></spreadsheet>
