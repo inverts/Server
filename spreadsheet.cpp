@@ -123,8 +123,9 @@ void spreadsheet::load_spreadsheet() {
 	if (temp != "contents")
 	  return; //Malformed.
 	std::getline(fs, temp, '<');
-	cells[callnametemp] = temp; //Fill in cell contents.
 
+	cells[callnametemp] = temp; //Fill in cell contents.
+	
 	std::getline(fs, temp, '>');
 	if (temp != "/contents")
 	  return; //Malformed.
@@ -241,7 +242,7 @@ pair<string,string> spreadsheet::undo()
   // if nothing has changed
   if( undoStack.top().first == "" && undoStack.top().second == "" )
     {
-      // do nothing? return null? let the method caller know there are no changes to be undone.
+      return p;
     }
   else
     {

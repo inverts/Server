@@ -15,17 +15,17 @@
  */
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
+#include <boost/enable_shared_from_this.hpp> //For class binds
 #include <boost/asio.hpp> 
 #include <boost/array.hpp>
-#include <boost/unordered_map.hpp>
-#include <dirent.h>  
-#include "spreadsheet.hpp"
+#include <boost/unordered_map.hpp> //For hashmap storage
+#include <dirent.h> //Used for reading directory file information
+#include "spreadsheet.hpp" //Spreadsheet object
 #include <iostream>  
 #include <string> 
 #include <cstdlib>
 #include <sstream>
-#include <boost/lexical_cast.hpp>
+#include <boost/lexical_cast.hpp> //For string/int conversions
 
 //Set to 1 to display debugging output.
 #define DEBUG_MODE 1
@@ -112,6 +112,34 @@ typedef boost::shared_ptr<client_connection> client_connection_ptr;
     if (spreadsheets->find(name) != spreadsheets->end()) {
       spreadsheets->at(name).remove_active_client();
       peers->remove(this->self);
+    }
+  }
+
+  enum {UNDO_OK, UNDO_END, UNDO_WAIT, UNDO_FAIL};
+  int undo_changes(string name, string version, string & fail_message, string & cellname, string & celldata) {
+    std::stringstream stream;
+    stream << version;
+    int vers;
+    if (!(stream >> vers)){
+      fail_message = "Invalid version number";
+      return UNDO_FAIL;
+    }
+    if (this->current_spreadsheet != name) {
+      fail_message = "No session with spreadsheet.";
+      return UNDO_FAIL; //This client doesn't have a session with that spreadsheet.
+    }
+    if (vers != spreadsheets->at(name).get_version()) {
+      fail_message = "Out of date version";
+      return UNDO_WAIT; //Incorrect version number.
+    }
+    pair<string,string> result = spreadsheets->at(this->current_spreadsheet).undo();
+    if (result.first=="") {
+      fail_message = "No changes to undo.";
+      return UNDO_END; 
+    } else {
+      cellname = result.first;
+      celldata = result.second;
+      return UNDO_OK;
     }
   }
 
@@ -403,7 +431,7 @@ public:
     if(DEBUG_MODE)
       cout << "Length: " << length << endl;
    
-    std::string celldata = data.substr(pl2);
+    std::string celldata = data.substr(pl2+1);
     if(DEBUG_MODE)
       cout << "Cell data: " << celldata << endl;
 
@@ -457,11 +485,9 @@ public:
     
    std::string name;
    std::string version;
-   std::string cell;
    std::string length;  
    std::string content;
    std::string msg;
-   boost::system::error_code ec;
    
    /* parse Name */
    std::size_t pos1 = 5+data.find("Name:");
@@ -474,122 +500,65 @@ public:
    std::size_t pv = 8+data.find("Version:");
    std::size_t pv2 = data.find('\n', pv);
    version = data.substr(pv, pv2-pv);
-
-
-       /*First check if version is a non-number, send error message if true */
-    //check for if version is a non-number
-    std::stringstream stream;
-    stream << version;
-    int n;
-    if(!(stream >> n))
-    {      
-       msg.append("CHANGE SP FAIL");
-       msg.push_back('\0');
-       msg.append("Name:");
-       msg.append(name);
-       msg.push_back('\0');
-       msg.append("FAIL MESSAGE");
-       msg.push_back('\0');       
-       writeMessage(msg);
-    }
-    //another check for non-number version input  
-    int checker;
-    try
-    {
-       checker = boost::lexical_cast<int>(version);
-    }
-    catch(const boost::bad_lexical_cast &)
-    {
-       msg.append("CHANGE SP FAIL");
-       msg.push_back('\0');
-       msg.append("Name:");
-       msg.append(name);
-       msg.push_back('\0');
-       msg.append("FAIL MESSAGE");
-       msg.push_back('\0');           
-       writeMessage(msg);
-    }
- 
-    // Convert string to int
-   string str = version;
-   int versNum;
-   istringstream (str) >> versNum;
-
-   if(DEBUG_MODE)
-     cout << "Version " << version << endl;
-  
-   //get cell name
-   spreadsheet *ssCell = &spreadsheets->at(name);
-   pair<string, string> p = ssCell->undo();
-   cell = p.first;
-   content = ssCell->get_cell_data(cell); 
-   //get length of contents
-   length = strlen(content.c_str());
-
-   ///***************************************************************************************************************
-   //if the request succeeded
-   if (this->current_spreadsheet == name && ssCell->get_version() == versNum)
-     {	
-       if(ssCell->try_update_cell(cell, content));
-       {	
-	 msg.append("UNDO SP OK");
-	 msg.push_back('\0');
-	 msg.append("Name:");
-	 msg.append(name);
-	 msg.push_back('\0');
-	 msg.append("Version:");
-	 msg.append(version);  
-	 msg.append("Cell:");
-	 msg.append(cell);
-	 msg.push_back('\0');
-	 msg.append("Length:");
-	 msg.append(length);
-	 msg.push_back('\0');
-	 msg.append(content);
-	 msg.push_back('\0');
-	 writeMessage(msg);
-       }
-     }
- 
-   /* if no unsaved changes */ 
-   else if ((p.first == "") && (p.second == ""))
-     {
-       msg.append("UNDO SP END");
-       msg.push_back('\0');
-       msg.append("Name:");
-       msg.append(name);
-       msg.push_back('\0');
-       msg.append("Version:");
-       msg.append(version);
-       msg.push_back('\0');
-       writeMessage(msg);
-     }
-
-   /* if version is out of date */
-   else if (versNum != ssCell->get_version())
-     {
-       msg.append("UNDO SP WAIT");
-       msg.push_back('\0');
-       msg.append("Name:");
-       msg.append(name);
-       msg.push_back('\0');
-       msg.append("Version:");
-       msg.append(version);        
-       msg.push_back('\0');
-       writeMessage(msg);
-     }
-  
-   else
-     {
+   std::string fail_message;
+   std::string cellname;
+   std::string celldata;
+   int result = undo_changes(name, version, fail_message, cellname, celldata); 
+   
+   if(result == UNDO_FAIL)
+     {      
        msg.append("UNDO SP FAIL");
        msg.push_back('\0');
        msg.append("Name:");
        msg.append(name);
        msg.push_back('\0');
-       msg.append("FAIL MESSAGE");
-       msg.push_back('\0');
+       msg.append("Bad Version Number");
+       msg.push_back('\0');       
        writeMessage(msg);
-     }   
+     } else if (result == UNDO_END) {
+     msg.append("UNDO SP END");
+     msg.push_back('\0');
+     msg.append("Name:");
+     msg.append(name);
+     msg.push_back('\0');
+     msg.append("Version:");
+     msg.append(version);
+     msg.push_back('\0');
+     writeMessage(msg);
+   } else if (result == UNDO_WAIT) {
+     msg.append("UNDO SP WAIT");
+     msg.push_back('\0');
+     msg.append("Name:");
+     msg.append(name);
+     msg.push_back('\0');
+     msg.append("Version:");
+     msg.append(version);        
+     msg.push_back('\0');
+     writeMessage(msg);
+   } else if (result == UNDO_OK) {
+     int length = strlen(celldata.c_str());
+     std::stringstream stream;
+     stream << length;
+     std::string len;
+     len = stream.str();
+     msg.append("UNDO SP OK");
+     msg.push_back('\0');
+     msg.append("Name:");
+     msg.append(name);
+     msg.push_back('\0');
+     msg.append("Version:");
+     msg.append(version);  
+     msg.append("Cell:");
+     msg.append(cellname);
+     msg.push_back('\0');
+     msg.append("Length:");
+     msg.append(len);
+     msg.push_back('\0');
+     msg.append(celldata);
+     msg.push_back('\0');
+     writeMessage(msg);
+   }
+  
   }
 
   void send_update(std::string spreadsheet_name, int version, std::string cellname, std::string celldata)
